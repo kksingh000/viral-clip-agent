@@ -1,0 +1,113 @@
+@import "tailwindcss";
+
+/* =============================================================================
+   Design tokens
+   A single accent, a neutral ramp, and three semantic score colours. Dark by
+   default because the product is looked at next to video.
+   ========================================================================== */
+@theme {
+  --color-ink-950: #08090c;
+  --color-ink-900: #0c0e13;
+  --color-ink-850: #10131a;
+  --color-ink-800: #151922;
+  --color-ink-700: #1e232e;
+  --color-ink-600: #2a3140;
+  --color-ink-500: #3d4557;
+  --color-ink-400: #616a80;
+  --color-ink-300: #8b93a7;
+  --color-ink-200: #b6bcca;
+  --color-ink-100: #dfe2ea;
+  --color-ink-50: #f4f5f8;
+
+  --color-accent-500: #6366f1;
+  --color-accent-400: #818cf8;
+  --color-accent-300: #a5b4fc;
+  --color-accent-600: #4f46e5;
+
+  --color-good-500: #34d399;
+  --color-warn-500: #fbbf24;
+  --color-bad-500: #f87171;
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+
+  --radius-card: 0.75rem;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--color-ink-950);
+  color: var(--color-ink-100);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* A quiet scrollbar; the default light one fights the dark surface. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-ink-600) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-ink-600);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--color-ink-500);
+  background-clip: content-box;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent-400);
+  outline-offset: 2px;
+}
+
+@utility surface {
+  background-color: var(--color-ink-900);
+  border: 1px solid var(--color-ink-700);
+  border-radius: var(--radius-card);
+}
+
+@utility surface-raised {
+  background-color: var(--color-ink-850);
+  border: 1px solid var(--color-ink-700);
+  border-radius: var(--radius-card);
+}
+
+/* Progress shimmer for running jobs. */
+@keyframes vca-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.animate-job {
+  animation: vca-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes vca-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.animate-spin-slow {
+  animation: vca-spin 0.9s linear infinite;
+}

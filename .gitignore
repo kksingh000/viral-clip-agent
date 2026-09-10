@@ -1,0 +1,32 @@
+# --- secrets
+.env
+.env.*
+!.env.example
+
+# --- python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- node
+node_modules/
+.next/
+out/
+next-env.d.ts
+
+# --- application data (media, working files, local databases)
+data/
+!data/.gitkeep
+
+# --- editors / os
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

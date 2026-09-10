@@ -1,0 +1,10 @@
+# Optional heavy dependencies for local (on-box) inference.
+#
+# The worker container installs these; the API container does not need them.
+# Without them, TRANSCRIPTION_PROVIDER must be "openai" or "mock" -- the
+# provider registry raises a clear configuration error rather than failing
+# mid-pipeline.
+
+-r requirements.txt
+
+faster-whisper==1.1.1

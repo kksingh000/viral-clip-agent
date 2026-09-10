@@ -1,0 +1,143 @@
+name: viral-clip-agent
+
+x-backend-env: &backend-env
+  ENVIRONMENT: ${ENVIRONMENT:-development}
+  SECRET_KEY: ${SECRET_KEY:?SECRET_KEY must be set - see .env.example}
+  DATABASE_URL: postgresql+asyncpg://viralagent:${POSTGRES_PASSWORD:-viralagent}@postgres:5432/viralagent
+  REDIS_URL: redis://redis:6379/0
+  STORAGE_PROVIDER: ${STORAGE_PROVIDER:-local}
+  STORAGE_LOCAL_ROOT: /data/storage
+  STORAGE_PUBLIC_BASE_URL: ${STORAGE_PUBLIC_BASE_URL:-http://localhost:8000/media}
+  WORKDIR: /data/work
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  LOG_JSON: ${LOG_JSON:-true}
+  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+  LLM_PROVIDER: ${LLM_PROVIDER:-mock}
+  LLM_MODEL: ${LLM_MODEL:-claude-sonnet-5}
+  LLM_MODEL_CHEAP: ${LLM_MODEL_CHEAP:-claude-haiku-4-5-20251001}
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  TRANSCRIPTION_PROVIDER: ${TRANSCRIPTION_PROVIDER:-mock}
+  WHISPER_MODEL_SIZE: ${WHISPER_MODEL_SIZE:-base}
+  WHISPER_DEVICE: ${WHISPER_DEVICE:-auto}
+  WHISPER_COMPUTE_TYPE: ${WHISPER_COMPUTE_TYPE:-int8}
+  YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
+  S3_BUCKET: ${S3_BUCKET:-}
+  S3_REGION: ${S3_REGION:-}
+  S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:-}
+  S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+  S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: viralagent
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-viralagent}
+      POSTGRES_DB: viralagent
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U viralagent -d viralagent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes", "--save", "60", "1"]
+    volumes:
+      - redis-data:/data
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # Runs migrations to completion, then exits. Everything else waits on it.
+  migrate:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment: *backend-env
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment: *backend-env
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - media-data:/data
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: ./worker/Dockerfile
+    environment: *backend-env
+    volumes:
+      - media-data:/data
+      - model-cache:/data/models
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    deploy:
+      replicas: ${WORKER_REPLICAS:-2}
+    restart: unless-stopped
+
+  # Periodic work: trend metric refresh, analytics sync, stale-job reaping.
+  beat:
+    build:
+      context: .
+      dockerfile: ./worker/Dockerfile
+    environment: *backend-env
+    command:
+      - celery
+      - -A
+      - app.workers.celery_app.celery_app
+      - beat
+      - --loglevel=info
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  redis-data:
+  media-data:
+  model-cache:
