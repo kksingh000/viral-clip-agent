@@ -28,8 +28,42 @@ import type {
   Video,
 } from "@/types/api";
 
-export const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
+declare global {
+  interface Window {
+    /** Injected per request by the root layout; see app/layout.tsx. */
+    __API_URL__?: string;
+  }
+}
+
+/**
+ * Where the API lives.
+ *
+ * Runtime value first: `NEXT_PUBLIC_*` is inlined at build time, so an image
+ * built once cannot be pointed at a different API later. The server injects
+ * the current value into every page, which is what makes the same image
+ * deployable to any host.
+ */
+function withScheme(value: string): string {
+  const trimmed = value.trim().replace(/\/$/, "");
+  if (!trimmed) return "";
+  if (trimmed.includes("://")) return trimmed;
+  // Hosting platforms expose a service address as a bare hostname. Fetching
+  // "api.example.com/api/v1/..." would resolve against the current page
+  // instead of the API, which fails in a thoroughly confusing way.
+  const scheme = /^(localhost|127\.0\.0\.1)/.test(trimmed) ? "http" : "https";
+  return `${scheme}://${trimmed}`;
+}
+
+function resolveApiBase(): string {
+  if (typeof window !== "undefined" && window.__API_URL__) {
+    return withScheme(window.__API_URL__);
+  }
+  return (
+    withScheme(process.env.NEXT_PUBLIC_API_URL ?? "") || "http://localhost:8000"
+  );
+}
+
+export const API_BASE = resolveApiBase();
 
 const API = `${API_BASE}/api/v1`;
 const TOKEN_KEY = "vca.access_token";

@@ -352,7 +352,7 @@ Errors are uniform and carry a stable code:
 
 ```bash
 cd backend
-pytest                        # everything (295 tests)
+pytest                        # everything (303 tests)
 pytest tests/unit -q          # fast: no ffmpeg
 pytest -m "not slow"          # skip the ffmpeg end-to-end
 ruff check app tests
@@ -443,16 +443,26 @@ viral-agent/
    without one — that is deliberate, not an obstacle to work around.
 2. **Set `CORS_ORIGINS`** to the exact origins the browser uses, scheme
    included. `localhost` and `127.0.0.1` are different origins.
-3. **Set `NEXT_PUBLIC_API_URL`** to the URL the *browser* reaches the API on,
-   not the internal service name. It is inlined at build time, so it must be
-   correct before `docker compose build`.
+3. **Set `API_URL`** to the URL the *browser* reaches the API on, not the
+   internal service name. It is read per request, so the same image works on
+   any host — no rebuild to repoint it. A bare hostname is promoted to
+   `https://` automatically. (`NEXT_PUBLIC_API_URL` still works as a
+   build-time fallback.)
 4. **Point storage somewhere durable.** `STORAGE_PROVIDER=s3` for more than one
    replica: the `local` backend writes to a volume only one node can see.
 5. **Choose providers.** With the defaults (`mock`) the system runs and is
    honest about it, but no model is consulted. Set `LLM_PROVIDER`,
    `TRANSCRIPTION_PROVIDER` and their keys for real output.
 
-### Deploy
+### Render
+
+A Render Blueprint is checked in as `render.yaml`. Two things differ from
+Compose and both matter: **object storage is mandatory** (a Render disk
+attaches to one service, so the API and workers cannot share a volume), and
+**background workers are not on the free tier**. Full walkthrough, costs and
+troubleshooting: [`docs/deploy-render.md`](docs/deploy-render.md).
+
+### Docker Compose
 
 ```bash
 docker compose up --build -d
@@ -528,7 +538,7 @@ only from the environment, with startup refusing to run in production without
 transcription (incl. sidecar), scene detection, segmentation, moment detection,
 scoring, de-duplication, framing, captions, rendering, QC with auto-correction,
 safety review, approval, export, the dashboard, and the job system. Verified by
-295 passing tests including real ffmpeg renders of every framing branch, and
+303 passing tests including real ffmpeg renders of every framing branch, and
 by running the full pipeline against a live API.
 
 **Verified up to the network boundary, not against a live account** — YouTube

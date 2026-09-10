@@ -183,6 +183,33 @@ class Settings(BaseSettings):
                     return [str(item).strip() for item in decoded if str(item).strip()]
         return [item.strip() for item in text.split(",") if item.strip()]
 
+    @field_validator("cors_origins", mode="after")
+    @classmethod
+    def _normalise_origins(cls, origins: list[str]) -> list[str]:
+        """Give every origin a scheme.
+
+        Platforms that expose a service address (Render's ``property: host``,
+        and others like it) hand over a bare hostname. A browser origin
+        without a scheme never matches, and the failure looks like a CORS
+        rejection with no obvious cause, so bare hosts are promoted to https.
+        """
+        normalised: list[str] = []
+        for origin in origins:
+            value = origin.strip().rstrip("/")
+            if not value:
+                continue
+            if "://" not in value:
+                # localhost is the one case where http is the sane guess.
+                scheme = (
+                    "http"
+                    if value.startswith(("localhost", "127.0.0.1"))
+                    else "https"
+                )
+                value = f"{scheme}://{value}"
+            if value not in normalised:
+                normalised.append(value)
+        return normalised
+
     @field_validator("storage_local_root", "workdir", mode="before")
     @classmethod
     def _expand_path(cls, v: Any) -> Any:

@@ -37,9 +37,15 @@ class TestCollectionSettings:
                 ["http://localhost:3000", "http://127.0.0.1:3000"],
             ),
             ("https://solo.example.com", ["https://solo.example.com"]),
-            ("  a.example.com , b.example.com  ", ["a.example.com", "b.example.com"]),
+            (
+                "  https://a.example.com , https://b.example.com  ",
+                ["https://a.example.com", "https://b.example.com"],
+            ),
             ('["https://x.example.com"]', ["https://x.example.com"]),
-            ("a.example.com,,b.example.com,", ["a.example.com", "b.example.com"]),
+            (
+                "https://a.example.com,,https://b.example.com,",
+                ["https://a.example.com", "https://b.example.com"],
+            ),
         ],
     )
     def test_cors_origins_accepts_every_documented_format(self, raw, expected):
@@ -72,8 +78,44 @@ class TestCollectionSettings:
 
     def test_malformed_json_falls_back_to_csv(self):
         assert build(secret_key="k", cors_origins="[not valid json").cors_origins == [
-            "[not valid json"
+            "https://[not valid json"
         ]
+
+
+class TestOriginNormalisation:
+    """Hosting platforms expose a service address as a bare hostname. An
+    origin without a scheme never matches a browser's Origin header, and the
+    failure surfaces as an unexplained CORS rejection."""
+
+    @pytest.mark.parametrize(
+        "raw,expected",
+        [
+            ("viralagent-web.onrender.com", ["https://viralagent-web.onrender.com"]),
+            ("https://app.example.com", ["https://app.example.com"]),
+            ("http://app.example.com", ["http://app.example.com"]),
+            ("localhost:3000", ["http://localhost:3000"]),
+            ("127.0.0.1:3000", ["http://127.0.0.1:3000"]),
+            (
+                "a.example.com,https://b.example.com",
+                ["https://a.example.com", "https://b.example.com"],
+            ),
+        ],
+    )
+    def test_bare_hosts_gain_a_scheme(self, raw, expected):
+        assert build(secret_key="k", cors_origins=raw).cors_origins == expected
+
+    def test_trailing_slashes_are_stripped(self):
+        """An Origin header never carries a trailing slash, so one here would
+        silently fail to match."""
+        assert build(
+            secret_key="k", cors_origins="https://app.example.com/"
+        ).cors_origins == ["https://app.example.com"]
+
+    def test_duplicates_collapse(self):
+        assert build(
+            secret_key="k",
+            cors_origins="app.example.com,https://app.example.com",
+        ).cors_origins == ["https://app.example.com"]
 
 
 class TestStartupGuards:
